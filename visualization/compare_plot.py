@@ -116,6 +116,78 @@ def plot_comparison(llm_metrics: dict, rnd_metrics: dict,
     return save_path
 
 
+def plot_strategies(stats: dict, names: list, colors: dict, seeds: list,
+                    save_path: str = None, title: str = None,
+                    metrics_cfg: list = None) -> str:
+    """
+    通用多策略对比图：每个指标一个子图，柱状 + 误差棒 + 各 seed 散点，黄框高亮最优。
+    stats: {name: agg}，agg 含 {key}_mean / {key}_std / {key}s（原始列表）。
+    names: 策略顺序；colors: {name: 颜色}。
+    metrics_cfg: [(子图标题, key, ylabel, higher_better), ...]，默认 4 指标。
+    """
+    if save_path is None:
+        os.makedirs(config.OUTPUT_DIR, exist_ok=True)
+        save_path = os.path.join(config.OUTPUT_DIR, "comparison_strategies.png")
+    if metrics_cfg is None:
+        metrics_cfg = [
+            ("订单完成率 (%)",   "rate", "%", True),
+            ("平均等待 (步)",    "wait", "步", False),
+            ("最长等待 (步)",    "maxw", "步", False),
+            ("平均接驾距离 (步)", "pick", "步", False),
+        ]
+
+    ncol = len(metrics_cfg)
+    fig, axes = plt.subplots(1, ncol, figsize=(4.6*ncol, 6))
+    if ncol == 1:
+        axes = [axes]
+    fig.suptitle(title or f"AgentSim — 多策略调度对比（N={len(seeds)} seeds）",
+                 fontsize=14, fontweight="bold")
+
+    x = np.arange(len(names))
+    for ax, (sub, key, ylabel, hb) in zip(axes, metrics_cfg):
+        means = [stats[n][f"{key}_mean"] for n in names]
+        stds  = [stats[n][f"{key}_std"]  for n in names]
+        raw   = [stats[n].get(f"{key}s", []) for n in names]
+        clrs  = [colors[n] for n in names]
+
+        bars = ax.bar(x, means, yerr=stds, capsize=6, width=0.62,
+                      color=clrs, alpha=0.9,
+                      error_kw={"elinewidth": 1.8, "ecolor": "#555"})
+        for xi, vals in zip(x, raw):
+            xs = [xi + np.random.uniform(-0.08, 0.08) for _ in vals]
+            ax.scatter(xs, vals, color="#333", s=22, zorder=5, alpha=0.5)
+        for bar, mean, std in zip(bars, means, stds):
+            ax.text(bar.get_x()+bar.get_width()/2, mean+std+max(means)*0.04,
+                    f"{mean:.1f}", ha="center", va="bottom",
+                    fontsize=9.5, fontweight="bold")
+        best = int(np.argmax(means)) if hb else int(np.argmin(means))
+        bars[best].set_edgecolor("#FFD600"); bars[best].set_linewidth(3.5)
+
+        ax.set_xticks(x); ax.set_xticklabels(names, fontsize=9.5, rotation=12)
+        ax.set_title(sub, fontsize=12, pad=8)
+        ax.set_ylabel(ylabel, fontsize=10)
+        ax.grid(axis="y", alpha=0.3)
+        ax.set_ylim(0, max(means) * 1.5 + max(stds) + 0.1)
+
+    fig.text(0.5, 0.005,
+             "黄框 = 该指标最优策略 ｜ 散点 = 各 seed 单次结果 ｜ 误差棒 = ±1 标准差",
+             ha="center", fontsize=10, color="#666")
+    plt.tight_layout(rect=[0, 0.03, 1, 0.91])
+    fig.savefig(save_path, dpi=130, bbox_inches="tight")
+    print(f"[多策略对比图] 已保存至 {save_path}")
+    return save_path
+
+
+# 向后兼容别名
+def plot_three_way(stats, seeds, save_path=None):
+    names = ["LLM调度", "匈牙利", "随机"]
+    colors = {"LLM调度": "#89B4FA", "匈牙利": "#A6E3A1", "随机": "#F38BA8"}
+    return plot_strategies(stats, names, colors, seeds, save_path,
+                           metrics_cfg=[("订单完成率 (%)", "rate", "%", True),
+                                        ("平均等待 (步)", "wait", "步", False),
+                                        ("车辆利用率 (%)", "util", "%", True)])
+
+
 def plot_multi_seed(llm_stats: dict, rnd_stats: dict,
                     seeds: list, llm_all: list, rnd_all: list,
                     save_path: str = None) -> str:

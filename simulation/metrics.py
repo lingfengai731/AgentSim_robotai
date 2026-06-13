@@ -21,6 +21,8 @@ class MetricsTracker:
                 num_drivers: int) -> dict:
         """计算最终 KPI 汇总。"""
         wait_times = [r.wait_steps for r in completed if r.wait_steps >= 0]
+        pickup_dists = [r.pickup_distance for r in completed
+                        if r.pickup_distance is not None]
 
         # 里程利用率：车辆处于 to_pickup/to_dropoff 的步数 / 总步数
         busy_counts = [
@@ -37,6 +39,7 @@ class MetricsTracker:
             "pending_orders":   len(pending),
             "avg_wait_steps":   sum(wait_times)/len(wait_times) if wait_times else 0,
             "max_wait_steps":   max(wait_times) if wait_times else 0,
+            "avg_pickup_dist":  sum(pickup_dists)/len(pickup_dists) if pickup_dists else 0,
             "utilization":      utilization,
         }
 

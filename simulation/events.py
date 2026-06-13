@@ -14,6 +14,7 @@ class PassengerRequest:
     assigned_driver_id: Optional[int] = None
     pickup_step:   Optional[int] = None   # 上车时间步
     dropoff_step:  Optional[int] = None   # 下车时间步
+    pickup_distance: Optional[int] = None # 派单时车辆到上车点的接驾距离（空驶里程）
 
     @property
     def wait_steps(self) -> int:

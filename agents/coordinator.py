@@ -44,10 +44,36 @@ class CoordinatorAgent(BaseAgent):
                 result["reason"] = "兜底：距离最近"
         return result
 
-    def move_driver(self, driver: dict, target: list,
-                    map_size: int, event: str = None) -> dict:
+    def assign_batch(self, passengers: list, drivers: list, blocked=None) -> list:
         """
-        调用对应 DriverAgent 计算下一步位置。
+        批量分配：对每个待分配乘客依次调用 LLM 调度，
+        已被本批选走的车辆在后续乘客的候选中剔除，避免一车多派。
+        （LLM 逐单推理，天然贪心；与匈牙利的全局最优形成对照。）
+        """
+        # 浅拷贝车辆状态，本批内被占用的车临时标记为非 idle
+        working = [dict(d) for d in drivers]
+        taken = set()
+        assignments = []
+        for p in passengers:
+            cands = [d for d in working
+                     if d["status"] == "idle" and d["id"] not in taken]
+            if not cands:
+                break
+            res = self.assign_order(p, cands)
+            did = res["assigned_driver_id"]
+            if did is not None:
+                taken.add(did)
+                assignments.append({
+                    "passenger_id": p["id"],
+                    "assigned_driver_id": did,
+                    "reason": res["reason"],
+                })
+        return assignments
+
+    def move_driver(self, driver: dict, target: list,
+                    map_size: int, event: str = None, blocked=None) -> dict:
+        """
+        调用对应 DriverAgent 计算下一步位置（A* 绕障）。
         event: DriverAgent.EVENT_* 常量，None 表示普通移动步。
         返回 {"next_pos": [x,y], "message": str}
         """
@@ -57,6 +83,7 @@ class CoordinatorAgent(BaseAgent):
             "target":   target,
             "map_size": map_size,
             "event":    event,
+            "blocked":  blocked,
         })
 
     def arbitrate(self, situation: str) -> str:

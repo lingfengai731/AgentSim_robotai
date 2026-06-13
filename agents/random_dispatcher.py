@@ -5,6 +5,7 @@ random_dispatcher.py — 随机调度基线（不调用 LLM）
 
 import random
 import math
+from simulation.pathfinding import next_step as _next_step
 
 
 class RandomDispatcher:
@@ -22,24 +23,28 @@ class RandomDispatcher:
             "reason": f"随机选择车辆{chosen['id']}",
         }
 
+    def assign_batch(self, passengers: list, drivers: list, blocked=None) -> list:
+        """批量随机匹配：把待分配乘客随机指派给互不重复的空闲车（基线对照）。"""
+        idle = [d for d in drivers if d["status"] == "idle"]
+        if not idle or not passengers:
+            return []
+        pool = idle[:]
+        random.shuffle(pool)
+        assignments = []
+        for p, d in zip(passengers, pool):   # 配对数 = min(乘客, 空闲车)
+            assignments.append({
+                "passenger_id": p["id"],
+                "assigned_driver_id": d["id"],
+                "reason": f"随机选择车辆{d['id']}",
+            })
+        return assignments
+
     def move_driver(self, driver: dict, target: list,
-                    map_size: int, event=None) -> dict:
-        """确定性移动，与 LLM 版保持一致（控制变量）。"""
+                    map_size: int, event=None, blocked=None) -> dict:
+        """确定性移动（A* 绕障），与其它调度器保持一致（控制变量）。"""
         pos = driver["pos"]
-        next_pos = self._move_toward(pos, target, map_size)
+        next_pos = _next_step(pos, target, map_size, blocked)
         return {
             "next_pos": next_pos,
             "message":  f"[随机] {pos}→{next_pos}",
         }
-
-    @staticmethod
-    def _move_toward(pos, target, map_size):
-        x, y   = pos
-        tx, ty = target
-        dx, dy = tx - x, ty - y
-        if abs(dx) >= abs(dy):
-            x += (1 if dx > 0 else -1) if dx != 0 else 0
-        else:
-            y += (1 if dy > 0 else -1) if dy != 0 else 0
-        return [max(0, min(map_size-1, x)),
-                max(0, min(map_size-1, y))]

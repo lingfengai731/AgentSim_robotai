@@ -6,6 +6,7 @@ driver.py — 司机 Agent
 
 import config
 from .base_agent import BaseAgent
+from simulation.pathfinding import next_step as _next_step
 
 
 class DriverAgent(BaseAgent):
@@ -38,8 +39,9 @@ class DriverAgent(BaseAgent):
         pos      = state["driver"]["pos"]
         event    = state.get("event")          # 有事件才调 LLM
         map_size = state["map_size"]
+        blocked  = state.get("blocked")        # 障碍物集合（A* 绕障）
 
-        next_pos = self._move_toward(pos, target, map_size)
+        next_pos = _next_step(pos, target, map_size, blocked)
 
         # 只在关键事件 或 未开启节流时才调 LLM
         if event or not config.DRIVER_LLM_ON_EVENT_ONLY:
