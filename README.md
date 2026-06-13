@@ -242,7 +242,7 @@ MODEL    = "mimo-v2.5-pro"
 ```
 
 4. 点击 **Deploy** → 约 2 分钟后获得公网链接 🎉
-
+https://agentsim-robotaxi.streamlit.app/
 ---
 
 ## 🔧 技术栈
